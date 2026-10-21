@@ -1,0 +1,26 @@
+# Виртуальное окружение и кеши
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Кеши инструментов
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Локальное окружение и секреты
+.env
+.env.*
+!.env.example
+
+# Служебные файлы
+.git/
+.gitignore
+.DS_Store
+.idea/
+.vscode/
+
+# Документация, не нужная в образе
+README.md
+pyproject.toml

@@ -1,0 +1,95 @@
+x-provider-common: &provider-common
+  build:
+    context: ./providers
+    dockerfile: Dockerfile
+  networks:
+    - app-network
+  environment: &provider-env
+    WEBHOOK_BASE_URL: "http://backend:8000"
+    PROVIDER_SHARED_SECRET: "${PROVIDER_SHARED_SECRET}"
+
+services:
+  db:
+    image: postgres:16
+    container_name: tokengen-db
+    env_file: ".env"
+    ports:
+      - "5433:5432"
+    volumes:
+      - backend-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tokengen-backend
+    env_file: ".env"
+    environment:
+      # Значения из окружения шелла имеют приоритет над .env — так настройки
+      # можно переопределять при запуске, не правя файл.
+      PROVIDER_TIMEOUT: "${PROVIDER_TIMEOUT:-60}"
+      PROVIDER_ALPHA_URL: "${PROVIDER_ALPHA_URL:-http://provider-alpha:8001}"
+      PROVIDER_BETA_URL: "${PROVIDER_BETA_URL:-http://provider-beta:8002}"
+      PROVIDER_SHARED_SECRET: "${PROVIDER_SHARED_SECRET}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+    volumes:
+      - ./backend:/backend
+    command: ["uvicorn", "src.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  provider-alpha:
+    <<: *provider-common
+    container_name: tokengen-provider-alpha
+    command: ["uvicorn", "provider_app:app", "--host", "0.0.0.0", "--port", "8001"]
+    ports:
+      - "8001:8001"
+    environment:
+      <<: *provider-env
+      PROVIDER_NAME: "alpha"
+      FAILURE_RATE: "${PROVIDER_ALPHA_FAILURE_RATE:-0.0}"
+      FAILURE_TYPE: "${PROVIDER_ALPHA_FAILURE_TYPE:-technical}"
+      SYNC_FAILURE: "${PROVIDER_ALPHA_SYNC_FAILURE:-none}"
+      DUPLICATE_WEBHOOK: "${PROVIDER_ALPHA_DUPLICATE_WEBHOOK:-false}"
+      NO_WEBHOOK: "${PROVIDER_ALPHA_NO_WEBHOOK:-false}"
+      LATE_COMPLETED: "${PROVIDER_ALPHA_LATE_COMPLETED:-false}"
+
+  provider-beta:
+    <<: *provider-common
+    container_name: tokengen-provider-beta
+    command: ["uvicorn", "provider_app:app", "--host", "0.0.0.0", "--port", "8002"]
+    ports:
+      - "8002:8002"
+    environment:
+      <<: *provider-env
+      PROVIDER_NAME: "beta"
+      FAILURE_RATE: "${PROVIDER_BETA_FAILURE_RATE:-0.0}"
+      FAILURE_TYPE: "${PROVIDER_BETA_FAILURE_TYPE:-technical}"
+      SYNC_FAILURE: "${PROVIDER_BETA_SYNC_FAILURE:-none}"
+      DUPLICATE_WEBHOOK: "${PROVIDER_BETA_DUPLICATE_WEBHOOK:-false}"
+      NO_WEBHOOK: "${PROVIDER_BETA_NO_WEBHOOK:-false}"
+      LATE_COMPLETED: "${PROVIDER_BETA_LATE_COMPLETED:-false}"
+
+volumes:
+  backend-db-volume:
+
+networks:
+  app-network:
+    driver: bridge

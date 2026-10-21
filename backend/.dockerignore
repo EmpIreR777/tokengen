@@ -1,0 +1,35 @@
+# Виртуальное окружение и кеши — в образ попадают только из uv sync
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Кеши инструментов
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Локальное окружение и секреты
+.env
+.env.*
+!.env.example
+
+# Служебные файлы
+.git/
+.gitignore
+.DS_Store
+.idea/
+.vscode/
+
+# Документация и скрипты, не нужные в образе
+README.md
+AGENT.md
+docs/
+scripts/
+tests/
+Makefile
+.pre-commit-config.yaml
